@@ -18,6 +18,8 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+DEFAULT_ROOTS = (r"C:\Users\Ravi\Downloads\JobTrackerAPP;C:\Users\Ravi\ai-career-copilot;"
+                 r"C:\Users\Ravi\ActionPlanApp")
 
 
 def find_config() -> Path:
@@ -34,15 +36,18 @@ def find_config() -> Path:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument(
-        "--roots",
-        default=r"C:\Users\Ravi\Downloads\JobTrackerAPP;C:\Users\Ravi\ai-career-copilot;C:\Users\Ravi\ActionPlanApp",
-        help='folders to watch, separated by ";" (each may hold projects or be a repo)')
-    ap.add_argument("--my-remotes", default="yassu,origin",
-                    help="remotes for push_my_accounts; the last one becomes upstream")
-    ap.add_argument("--gitlab-url", default="https://gitlab.com")
+        "--roots", default=None,
+        help='folders to watch, separated by ";" (each may hold projects or be a repo). '
+             "If omitted, the folders already in your config are kept")
+    ap.add_argument("--my-remotes", default=None,
+                    help="remotes for push_my_accounts; the last one becomes upstream "
+                         "(default: keep what is in the config)")
+    ap.add_argument("--gitlab-url", default=None)
     ap.add_argument("--gitlab-token", default="")
-    ap.add_argument("--github-accounts", default="origin=Yasaswinid24,yassu=Yassu-24",
-                    help='"remote=username,..." used by create_github_repos')
+    ap.add_argument("--github-accounts", default=None,
+                    help='"remote=username,..." used by create_github_repos '
+                         "(default: keep the accounts already in the config, "
+                         "else origin=Yasaswinid24,yassu=Yassu-24)")
     ap.add_argument("--ask-github-tokens", action="store_true",
                     help="prompt (hidden) for each account's token; nothing is echoed or "
                          "saved in your shell history")
@@ -65,6 +70,9 @@ def main() -> None:
         if remote and token:
             old_tokens[(remote, user)] = token
 
+    if not args.github_accounts:
+        args.github_accounts = ",".join(f"{r}={u}" for r, u in old_tokens) \
+            or "origin=Yasaswinid24,yassu=Yassu-24"
     github_parts = []
     for part in args.github_accounts.split(","):
         remote, _, user = part.strip().partition("=")
@@ -79,6 +87,10 @@ def main() -> None:
         else:
             print(f"Note: no token for {user}; create_github_repos will skip setup until "
                   "you run again with --ask-github-tokens.")
+
+    args.roots = args.roots or servers_old.get("DEV_MCP_ROOTS") or DEFAULT_ROOTS
+    args.my_remotes = args.my_remotes or servers_old.get("DEV_MCP_MY_REMOTES") or "yassu,origin"
+    args.gitlab_url = args.gitlab_url or servers_old.get("GITLAB_URL") or "https://gitlab.com"
 
     entry = {
         "command": str(python),
