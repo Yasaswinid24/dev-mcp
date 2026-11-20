@@ -9,6 +9,7 @@ Quit Claude Desktop completely BEFORE running this, then reopen it afterwards.
 The app rewrites this file while it runs and would overwrite the change.
 """
 import argparse
+import getpass
 import json
 import os
 import shutil
@@ -40,6 +41,11 @@ def main() -> None:
                     help="remotes for push_my_accounts; the last one becomes upstream")
     ap.add_argument("--gitlab-url", default="https://gitlab.com")
     ap.add_argument("--gitlab-token", default="")
+    ap.add_argument("--github-accounts", default="origin=Yasaswinid24,yassu=Yassu-24",
+                    help='"remote=username,..." used by create_github_repos')
+    ap.add_argument("--ask-github-tokens", action="store_true",
+                    help="prompt (hidden) for each account's token; nothing is echoed or "
+                         "saved in your shell history")
     ap.add_argument("--config", default="", help="config path (default: auto-detect)")
     args = ap.parse_args()
 
@@ -51,6 +57,29 @@ def main() -> None:
     else:
         python = HERE / ".venv" / "bin" / "python"
 
+    servers_old = data.get("mcpServers", {}).get("dev-helper", {}).get("env", {})
+    old_tokens = {}
+    for part in servers_old.get("DEV_MCP_GITHUB", "").split(","):
+        remote, _, rest = part.strip().partition("=")
+        user, _, token = rest.partition(":")
+        if remote and token:
+            old_tokens[(remote, user)] = token
+
+    github_parts = []
+    for part in args.github_accounts.split(","):
+        remote, _, user = part.strip().partition("=")
+        if not (remote and user):
+            continue
+        token = old_tokens.get((remote, user), "")
+        if args.ask_github_tokens:
+            typed = getpass.getpass(f"GitHub token for {user} (Enter keeps current): ").strip()
+            token = typed or token
+        if token:
+            github_parts.append(f"{remote}={user}:{token}")
+        else:
+            print(f"Note: no token for {user}; create_github_repos will skip setup until "
+                  "you run again with --ask-github-tokens.")
+
     entry = {
         "command": str(python),
         "args": [str(HERE / "server.py")],
@@ -59,6 +88,7 @@ def main() -> None:
             "DEV_MCP_MY_REMOTES": args.my_remotes,
             "GITLAB_URL": args.gitlab_url,
             "GITLAB_TOKEN": args.gitlab_token,
+            "DEV_MCP_GITHUB": ",".join(github_parts),
         },
     }
 

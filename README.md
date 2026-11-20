@@ -14,6 +14,7 @@ It complements the official GitHub MCP: GitHub's server works on github.com, thi
 | `git_log` | Last commits |
 | `git_push` | Push to one or more named remotes. Dry run unless `confirm=true` |
 | `push_my_accounts` | Push to the remotes in `DEV_MCP_MY_REMOTES` (for example `yassu,origin`). Dry run unless `confirm=true`. The last remote becomes the upstream |
+| `create_github_repos` | Create an empty repo on each account in `DEV_MCP_GITHUB` and point a remote at each. Private by default, dry run unless `confirm=true`, skips repos that exist, never pushes |
 | `show_log` | The most recent tool calls: time, tool, arguments, outcome |
 | `run_tests` | Run pytest using the project's own `.venv`/`venv` Python (falls back to `python` on PATH) |
 | `docker_build` | Build an image from the project's Dockerfile |
@@ -94,6 +95,7 @@ Login still comes from Git Credential Manager, so sign in to each account the fi
 |---|---|
 | `DEV_MCP_ROOTS` | Folders to watch, separated by `;`. Each can hold projects or be a repo itself. `DEV_MCP_ROOT` (one folder) still works |
 | `DEV_MCP_MY_REMOTES` | Remotes for `push_my_accounts`, comma separated |
+| `DEV_MCP_GITHUB` | For `create_github_repos`: `remote=username:token,remote2=username2:token2`. The token needs permission to create repos (classic token: `repo` scope). It lives only in the Claude Desktop config, never in the repo. Set it with `python register_desktop.py --ask-github-tokens` |
 | `DEV_MCP_LOG` | Log file path (default: `dev-helper.log` next to `server.py`) |
 | `GITLAB_URL`, `GITLAB_TOKEN` | For the GitLab tools |
 
@@ -133,6 +135,13 @@ so they never touch your real projects or the network. CI runs both on every pus
 Adding a tool: write the logic in `devhelper/ops.py` with a test in `tests/`,
 then add a short wrapper with a clear docstring in `server.py`.
 Restart Claude Desktop afterwards so it loads the new version.
+
+## Changes in version 1.4
+
+- New tool `create_github_repos`: creates the repository on each GitHub account and sets the remotes, so publishing a project is one request plus `push_my_accounts`.
+- Safety: private by default, dry run unless confirmed, tokens never appear in remote URLs, results or the call log, and a token that belongs to a different user than expected is refused before anything is created.
+- `register_desktop.py --ask-github-tokens` asks for tokens with hidden input, so they stay out of your shell history.
+- 105 unit tests and 30 end-to-end checks.
 
 ## Changes in version 1.3
 

@@ -3,11 +3,29 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
 
 HERE = Path(__file__).resolve().parent.parent  # the dev-mcp folder
+
+
+@dataclass(frozen=True)
+class GithubAccount:
+    remote: str                      # name of the git remote, e.g. "origin"
+    user: str                        # GitHub username
+    token: str = field(repr=False)   # never shown in logs or tracebacks
+
+
+def parse_github(raw: str) -> tuple[GithubAccount, ...]:
+    """Parse "origin=UserA:token,yassu=UserB:token". Malformed entries are skipped."""
+    accounts = []
+    for part in raw.split(","):
+        remote, sep, rest = part.strip().partition("=")
+        user, sep2, token = rest.partition(":")
+        if sep and sep2 and remote.strip() and user.strip() and token.strip():
+            accounts.append(GithubAccount(remote.strip(), user.strip(), token.strip()))
+    return tuple(accounts)
 
 
 @dataclass(frozen=True)
@@ -16,7 +34,8 @@ class Config:
     log_path: Path
     my_remotes: tuple[str, ...] = ()
     gitlab_url: str = "https://gitlab.com"
-    gitlab_token: str = ""
+    gitlab_token: str = field(default="", repr=False)
+    github: tuple[GithubAccount, ...] = ()
     max_output: int = 8000        # characters returned to the model
     log_max_bytes: int = 1_000_000
 
@@ -44,4 +63,5 @@ class Config:
             my_remotes=remotes,
             gitlab_url=(env.get("GITLAB_URL") or "https://gitlab.com").rstrip("/"),
             gitlab_token=env.get("GITLAB_TOKEN", ""),
+            github=parse_github(env.get("DEV_MCP_GITHUB", "")),
         )

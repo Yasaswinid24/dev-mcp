@@ -10,6 +10,10 @@ Environment variables:
                       DEV_MCP_ROOT (one folder) still works.
   DEV_MCP_MY_REMOTES  Remotes for push_my_accounts, e.g. "yassu,origin". The last one
                       becomes the tracking (upstream) branch.
+  DEV_MCP_GITHUB      GitHub accounts for create_github_repos, as
+                      "remote=username:token,remote2=username2:token2". Use a token that
+                      may create repositories (classic token: "repo" scope). Keep it out
+                      of git: it lives only in the Claude Desktop config.
   DEV_MCP_LOG         Log file path (default: dev-helper.log next to this file)
   GITLAB_URL          e.g. https://gitlab.com (default) or your university GitLab
   GITLAB_TOKEN        GitLab personal access token with read_api scope
@@ -102,6 +106,26 @@ def push_my_accounts(project: str, branch: str = "main", confirm: bool = False) 
     branch's upstream (tracking) remote.
     """
     return ops.push_my_accounts(cfg, project, branch, confirm)
+
+
+@mcp.tool()
+@_safe
+def create_github_repos(
+    project: str,
+    name: str = "",
+    private: bool = True,
+    description: str = "",
+    confirm: bool = False,
+) -> str:
+    """Create a new, empty GitHub repository for a project on each of your accounts.
+
+    Uses the accounts in DEV_MCP_GITHUB and points one git remote at each. Private by
+    default; only pass private=false if the user explicitly wants it public. Dry run
+    unless confirm=true, so show the user the plan first. name defaults to the project
+    folder name. Does not push: call push_my_accounts afterwards. Skips repos that
+    already exist.
+    """
+    return ops.create_github_repos(cfg, project, name, private, description, confirm)
 
 
 # ------------------------------------------------------- tests and docker

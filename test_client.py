@@ -35,6 +35,7 @@ async def main():
         "DEV_MCP_LOG": str(log_file),
     }
     env.pop("DEV_MCP_ROOT", None)
+    env.pop("DEV_MCP_GITHUB", None)   # the test must not see real tokens
     params = StdioServerParameters(
         command=sys.executable, args=[str(Path(__file__).parent / "server.py")], env=env
     )
@@ -44,6 +45,7 @@ async def main():
             tools = await s.list_tools()
             names = [t.name for t in tools.tools]
             check("git_diff tool is listed", "git_diff" in names)
+            check("create_github_repos tool is listed", "create_github_repos" in names)
 
             async def call(tool, **kw):
                 res = await s.call_tool(tool, kw)
@@ -53,6 +55,10 @@ async def main():
             proj = root / "demo-api"
             for k, v in (("user.email", "t@t.t"), ("user.name", "T")):
                 subprocess.run(["git", "config", k, v], cwd=proj)
+
+            out = await call("create_github_repos", project="demo-api", confirm=True)
+            check("create_github_repos without accounts explains itself",
+                  "No GitHub accounts configured" in out and "DEV_MCP_GITHUB" in out)
 
             # nothing staged, add_all not requested -> refuses and explains
             out = await call("git_commit", project="demo-api", message="x")

@@ -5,9 +5,10 @@ Expected problems raise ValueError; server.py turns those into readable messages
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
-from . import calllog, gitlab, paths
+from . import calllog, github, gitlab, paths
 from .config import Config
 from .runner import git_lines, run
 from .safety import looks_secret
@@ -126,6 +127,56 @@ def push_my_accounts(cfg: Config, project: str, branch: str, confirm: bool) -> s
     if not cfg.my_remotes:
         raise ValueError('Set DEV_MCP_MY_REMOTES in the MCP config, for example "yassu,origin".')
     return push(cfg, project, list(cfg.my_remotes), branch, confirm)
+
+
+REPO_NAME = re.compile(r"[A-Za-z0-9._-]{1,100}")
+
+
+def create_github_repos(cfg: Config, project: str, name: str, private: bool,
+                        description: str, confirm: bool) -> str:
+    """Create the repo on every configured GitHub account and point a remote at each.
+
+    Does not push. Dry run unless confirm is true.
+    """
+    p = paths.resolve_project(cfg, project)
+    if not cfg.github:
+        raise ValueError(
+            "No GitHub accounts configured. Set DEV_MCP_GITHUB in the MCP config, "
+            'for example "origin=UserA:token,yassu=UserB:token".'
+        )
+    repo_name = name.strip() or p.name
+    if (not REPO_NAME.fullmatch(repo_name) or repo_name in (".", "..")
+            or repo_name.endswith(".git")):
+        raise ValueError(f"'{repo_name}' is not a valid GitHub repository name.")
+
+    visibility = "private" if private else "PUBLIC"
+    known = _run(cfg, ["git", "remote"], p).split()
+
+    if not confirm:
+        lines = [f"DRY RUN: would create a {visibility} repository '{repo_name}' on:"]
+        for a in cfg.github:
+            action = "update" if a.remote in known else "add"
+            lines.append(f"  - {a.user}  ({action} remote '{a.remote}')")
+        lines.append("Nothing is pushed. Call again with confirm=true after the user agrees"
+                     + (" (they asked for PUBLIC, so say so)." if not private else "."))
+        return "\n".join(lines)
+
+    lines = []
+    for a in cfg.github:
+        url = f"https://{a.user}@github.com/{a.user}/{repo_name}.git"
+        try:
+            outcome = github.ensure_repo(a, repo_name, private, description)
+        except ValueError as e:
+            lines.append(f"{a.user}: FAILED - {e}")
+            continue
+        verb = "set-url" if a.remote in known else "add"
+        res = _run(cfg, ["git", "remote", verb, a.remote, url], p)
+        if res.startswith("exit code"):
+            lines.append(f"{a.user}: repo {outcome}, but setting the remote failed: {res}")
+        else:
+            lines.append(f"{a.user}: repo {outcome} ({visibility}); remote '{a.remote}' -> {url}")
+    lines.append("Next: push with push_my_accounts (or git_push) after the user confirms.")
+    return "\n".join(lines)
 
 
 # ------------------------------------------------------------ tests, docker
