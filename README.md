@@ -3,6 +3,12 @@
 A small MCP server that gives Claude tools for your local developer workflow.
 It complements the official GitHub MCP: GitHub's server works on github.com, this one works on your computer.
 
+## Architecture
+
+![dev-mcp architecture: Claude talks to server.py over MCP; devhelper modules run git, tests, Docker, GitLab and GitHub calls behind safety checks](docs/architecture.png)
+
+The diagram source is [`docs/architecture.xml`](docs/architecture.xml). Open it at app.diagrams.net (File, Open from, Device) to edit it.
+
 ## Tools
 
 | Tool | What it does |
